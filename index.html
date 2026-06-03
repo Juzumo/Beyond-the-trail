@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snow Mountain Book</title>
+    <style>
+        /* 替换全局光标为小雪花 */
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; user-select: none; 
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"></line></svg>') 9 9, auto !important; 
+        }
+        
+        body, html {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #a9c2d6 linear-gradient(180deg, #1b263b 0%, #61a5c2 45%, #a9c2d6 100%);
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+        }
+
+        /* 音乐控制按钮样式 */
+        #bgm-toggle {
+            position: fixed; top: 25px; right: 25px;
+            z-index: 9999999;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            color: rgba(255,255,255,0.5); font-size: 15px;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        #bgm-toggle:hover {
+            color: #fff; border-color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.1);
+        }
+        #bgm-toggle.playing {
+            color: #fff; border-color: rgba(255,255,255,0.8);
+            box-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }
+
+        #ambient-snow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 99999; pointer-events: none;
+        }
+
+        #particle-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10000; pointer-events: none; opacity: 0; transition: opacity 2s ease;
+        }
+        
+        #ice-fog {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, rgba(240, 248, 255, 1) 0%, rgba(240, 248, 255, 0.9) 45%, rgba(240, 248, 255, 0.5) 80%, rgba(240, 248, 255, 0) 100%);
+            filter: blur(40px);
+            opacity: 0; transition: opacity 2s ease-in-out;
+            z-index: 15000; pointer-events: none;
+        }
+
+        #main-stage {
+            position: relative; z-index: 10;
+            width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
+            perspective: 2300px;
+            transition: filter 1.2s ease, transform 1.2s ease, opacity 1.2s;
+        }
+
+        #intro-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 20000; pointer-events: none; display: flex;
+        }
+
+        #start-container {
+            position: absolute; top: 25%; right: 12%; 
+            display: flex; flex-direction: column; align-items: flex-end;
+            z-index: 20001; pointer-events: auto;
+            transition: opacity 1s ease;
+        }
+
+        #start-pointer-wrapper {
+            align-self: center; 
+            margin-bottom: 15px;
+            position: relative;
+            right: -40px; 
+            opacity: 0;
+            animation: startPointerEnter 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            animation-delay: 2.5s; 
+        }
+
+        #start-pointer {
+            width: 120px; 
+            height: auto;
+            display: block;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease;
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+        }
+        
+        #start-pointer:hover {
+            transform: scale(1.35);
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 1)) brightness(1.3);
+            cursor: pointer;
+        }
+
+        @keyframes startPointerEnter {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #intro-data-panel {
+            display: flex; flex-direction: column; align-items: flex-end;
+        }
+
+        .data-line {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.85); 
+            text-shadow: 0 0 4px rgba(255, 255, 255, 0.4); 
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+            text-align: right;
+            opacity: 0;
+            transform: translateY(15px);
+            animation: slideUpFade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes slideUpFade {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .four-point-star {
+            position: relative; width: 14px; height: 14px; background: #fff;
+            clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+            margin-left: 2px;
+        }
+
+        #golden-path-svg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+        }
+        
+        .path-star {
+            position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%;
+            box-shadow: 0 0 10px 2px rgba(255, 248, 220, 0.9), 0 0 20px 5px rgba(255, 255, 255, 0.6); 
+            opacity: 0; transform: translate(-50%, -50%) scale(0.3);
+            transition: all 0.6s ease;
+        }
+        .path-star.bright {
+            width: 12px; height: 12px; 
+            box-shadow: 0 0 20px 8px #fff, 0 0 40px 15px #fff8dc; 
+            background: #fff; z-index: 10;
+        }
+        .path-star.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        #book-wrapper {
+            position: relative; 
+            width: 900px; height: 550px;
+            transform-style: preserve-3d;
+            opacity: 0;
+            transform: scale(0.7);
+            pointer-events: none;
+        }
+
+        .book {
+            position: relative; width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            box-shadow: 0 0 80px rgba(147, 197, 253, 0.15); 
+        }
+
+        .sheet {
+            position: absolute; width: 50%; height: 100%; right: 0; top: 0;
+            transform-style: preserve-3d;
+            transform-origin: left center;
+            transition: transform 1.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s ease;
+        }
+        .sheet.flipped { transform: rotateY(-180deg); }
+
+        .page-face {
+            position: absolute; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.05); 
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(147, 197, 253, 0.35); 
+            backface-visibility: hidden; -webkit-backface-visibility: hidden;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 45px;
+            outline: 1px solid transparent; 
+        }
+        
+        .page-face.front { transform: rotateY(0deg) translateZ(1.5px); }
+        .page-face.back { transform: rotateY(180deg) translateZ(1.5px); }
+
+        .shadow-left-page { box-shadow: -15px 30px 60px rgba(0,0,0,0.35); }
+
+        .left-page-content { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .right-page-content { width: 100%; text-align: left; padding: 20px; }
+        
+        .right-page-content h2 { 
+            color: #fff; 
+            font-weight: 300; 
+            letter-spacing: 3px; 
+            margin-bottom: 25px; 
+            font-size: 22px; 
+            text-shadow: 1px 2px 4px rgba(27, 38, 59, 0.8), 0 0 8px rgba(147, 197, 253, 0.35); 
+        }
+        .right-page-content p { color: #94a3b8; font-weight: 300; font-size: 13px; line-height: 2.2; letter-spacing: 1.2px; }
+
+        .mountain-img {
+            width: 400px; height: 400px;
+            object-fit: contain;
+            transition: filter 0.4s, transform 0.4s;
+            cursor: pointer;
+        }
+        .mountain-img:hover {
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.4)) brightness(1.2);
+        }
+
+        .page-mountain {
+            width: 0; height: 0;
+            transition: filter 0.4s, transform 0.4s;
+        }
+        .page-mountain:not(.stacked-mountain):hover { filter: drop-shadow(0 0 20px rgba(255,255,255,0.4)) brightness(1.2); }
+
+        .type-crystal { border-left: 75px solid transparent; border-right: 75px solid transparent; border-bottom: 170px solid rgba(147, 197, 253, 0.45); }
+        .type-frosted { border-left: 95px solid transparent; border-right: 95px solid transparent; border-bottom: 150px solid rgba(241, 245, 249, 0.35); }
+        .type-obsidian { border-left: 85px solid transparent; border-right: 85px solid transparent; border-bottom: 180px solid rgba(45, 212, 191, 0.3); }
+
+        .stacked-mountain.type-crystal { border-bottom-color: rgba(147, 197, 253, 0.08) !important; } 
+        .stacked-mountain.type-frosted { border-bottom-color: rgba(255, 255, 255, 0.05) !important; } 
+        .stacked-mountain.type-obsidian { border-bottom-color: rgba(45, 212, 191, 0.06) !important; } 
+
+        #zoom-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 8000; opacity: 0; pointer-events: none;
+            background: radial-gradient(circle at center, rgba(13, 15, 20, 0.95) 0%, #050608 100%);
+            transition: opacity 1s ease;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #zoom-overlay.active { opacity: 1; pointer-events: auto; }
+
+        #floating-mountain-target {
+            position: relative; 
+            transform: scale(1) translateY(-20px); 
+            opacity: 0;
+            transition: opacity 1s ease; 
+            pointer-events: none; 
+            display: flex; justify-content: center; align-items: center;
+        }
+        #zoom-overlay.active #floating-mountain-target {
+            opacity: 1;
+            animation: targetEnter 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards, staticFloat 6s ease-in-out infinite 1.2s;
+        }
+        @keyframes targetEnter {
+            0% { transform: scale(0.6) translateY(0); opacity: 0; }
+            100% { transform: scale(1) translateY(-20px); opacity: 1; }
+        }
+        @keyframes staticFloat {
+            0%, 100% { transform: scale(1) translateY(-20px); }
+            50% { transform: scale(1) translateY(-26px); }
+        }
+
+        #snow-canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 1; }
+
+        #cloud-text-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 10; }
+        
+        /* 移除云朵背景图并重写关键帧以支持平缓的漂浮和呼吸感 */
+        .cloud-text {
+            position: absolute; color: rgba(255,255,255,0.9); font-weight: 300;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(147, 197, 253, 0.4);
+            letter-spacing: 4px; white-space: nowrap;
+            opacity: 0;
+            transform: translate(-50%, 0%);
+        }
+
+        @keyframes cloudFloat {
+            0% { transform: translate(-50%, 0%); opacity: 0; filter: blur(3px); }
+            50% { transform: translate(-50%, -20%); opacity: 0.95; filter: blur(0px); }
+            100% { transform: translate(-50%, -40%); opacity: 0; filter: blur(3px); }
+        }
+
+        .nav-btn {
+            position: fixed; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: rgba(255,255,255,0.2);
+            font-size: 26px; z-index: 4000; transition: color 0.3s;
+            outline: none !important; box-shadow: none !important;
+            opacity: 0; pointer-events: none; 
+        }
+        .nav-btn:hover { color: #fff; }
+        #prev-btn { left: 4vw; } #next-btn { right: 4vw; }
+
+        .btn-close {
+            position: absolute; bottom: 8%; background: none; border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.5); padding: 9px 24px; letter-spacing: 2px; font-size: 11px;
+            z-index: 9000; border-radius: 2px; text-align: center;
+            outline: none !important; box-shadow: none !important;
+            cursor: pointer;
+        }
+        .btn-close:hover { border-color: #fff; color: #fff; }
+
+        #center-ending-container {
+            position: absolute; z-index: 5000; opacity: 0; pointer-events: none; 
+            transition: opacity 1.5s ease; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding-bottom: 25vh; 
+            width: 100%; height: 100%;
+        }
+        
+        .choice-btn {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 240px; margin: 15px auto 0; background: none;
+            border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+            padding: 12px; letter-spacing: 2px; font-size: 13px;
+            border-radius: 3px; transition: all 0.3s; text-align: center;
+            outline: none !important; box-shadow: none !important;
+            cursor: pointer;
+        }
+        .choice-btn:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.05); box-shadow: 0 0 12px rgba(255,255,255,0.15); }
+
+        #final-universe-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9000; opacity: 0; pointer-events: none;
+            background: #050608; transition: opacity 2s ease;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #final-universe-overlay.active { opacity: 1; pointer-events: auto; }
+
+        #giant-mountain-nest {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+            display: flex; justify-content: center; align-items: center;
+            padding-top: 18vh;
+        }
+        
+        .stacked-mountain {
+            position: absolute; bottom: -50px; opacity: 0;
+            transform: translateX(-50%) scale(0.2);
+            transition: all 1.8s cubic-bezier(0.25, 1, 0.5, 1);
+            pointer-events: none !important; 
+        }
+
+        #divine-face-lines { display: none; }
+
+        #poem-box {
+            position: absolute; top: 25%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; width: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 20; pointer-events: none;
+        }
+        #poem-box p {
+            font-size: 14px; font-weight: 300; line-height: 2.8; 
+            letter-spacing: 5px; 
+            text-indent: 5px; 
+            color: rgba(255,255,255,0); filter: blur(3px);
+            transition: color 2s ease, filter 2s ease;
+        }
+        
+        #rest-btn {
+            position: absolute; bottom: 12%; left: 50%; 
+            transform: translateX(-50%);
+            z-index: 6000; opacity: 0; pointer-events: none;
+            background: none; border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.8); padding: 10px 30px; 
+            letter-spacing: 4px; font-size: 14px; border-radius: 4px;
+            transition: all 0.5s ease;
+            outline: none !important; box-shadow: none !important;
+            cursor: pointer;
+        }
+        #rest-btn:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.05); }
+
+        #blackout-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 999999; opacity: 0; pointer-events: none;
+            transition: opacity 3s ease;
+        }
+
+        .interactive-cake {
+            width: 140px; object-fit: contain;
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.15));
+            transition: filter 0.5s ease, transform 0.5s ease, opacity 1.5s ease;
+        }
+        .interactive-cake:hover {
+            filter: drop-shadow(0 -30px 40px rgba(255, 255, 255, 0.95)) brightness(1.1) !important;
+            transform: scale(1.05);
+            cursor: pointer;
+        }
+
+        #blizzard-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9999998; opacity: 0; transition: opacity 1.5s ease; pointer-events: none;
+        }
+
+        #whiteout-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #fff; z-index: 9999999; opacity: 0; pointer-events: none;
+        }
+
+        .layout-locked { pointer-events: none !important; overflow: hidden !important; }
+
+        #water-drop {
+            position: fixed; top: -5%; left: 50%; transform: translateX(-50%);
+            width: 3px; height: 15px; background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%; z-index: 1000001; opacity: 0; pointer-events: none;
+            box-shadow: 0 0 10px 2px rgba(255,255,255,0.8);
+        }
+
+        #water-ripple {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 0; height: 0; z-index: 1000001; pointer-events: none;
+            display: flex; justify-content: center; align-items: center;
+            will-change: transform;
+        }
+
+        .ripple-arc {
+            position: absolute; border-radius: 50%; opacity: 0; box-shadow: 0 0 15px rgba(147, 197, 253, 0.3);
+            will-change: transform, opacity, border-width;
+        }
+        .ripple-arc.arc-1 { border: 2px solid rgba(255, 255, 255, 0.8); border-bottom-color: transparent; border-left-color: transparent; transform: rotate(15deg); }
+        .ripple-arc.arc-2 { border: 2px solid rgba(190, 220, 255, 0.5); border-top-color: transparent; border-right-color: transparent; transform: rotate(45deg); }
+        .ripple-arc.arc-3, .ripple-arc.arc-4 { display: none; }
+
+        @keyframes rippleExpand1 {
+            0% { width: 0; height: 0; opacity: 1; border-width: 3px; }
+            100% { width: 120vw; height: 120vw; opacity: 0; border-width: 0.5px; }
+        }
+        @keyframes rippleExpand2 {
+            0% { width: 0; height: 0; opacity: 0.7; border-width: 4px; }
+            100% { width: 100vw; height: 100vw; opacity: 0; border-width: 1px; }
+        }
+        #water-ripple.expanding .arc-1 { animation: rippleExpand1 4s cubic-bezier(0, 0, 0.2, 1) forwards; }
+        #water-ripple.expanding .arc-2 { animation: rippleExpand2 4.5s cubic-bezier(0, 0, 0.2, 1) forwards 0.2s; }
+
+        /* ---------- K2 彩蛋新增交互 ---------- */
+        .k2-line {
+            pointer-events: auto;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        .k2-line:hover {
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.9);
+            cursor: none !important;
+        }
+
+        #glowing-cursor {
+            position: fixed;
+            width: 33px; height: 33px; 
+            background: url('Snowflake.png') center/cover;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999999;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px 10px rgba(147, 197, 253, 0.6); 
+            transition: opacity 0.3s ease;
+        }
+
+        #letter-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.4) 0%, rgba(240, 248, 255, 0.15) 60%, rgba(255, 255, 255, 0) 100%);
+            backdrop-filter: blur(8px); 
+            z-index: 1000000; display: none; justify-content: center; align-items: center;
+            opacity: 0; 
+            transition: opacity 2.5s ease; 
+        }
+
+        #letter-wrapper {
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #letter-img {
+            transition: width 2.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 2.5s ease; 
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.4));
+            cursor: pointer;
+            object-fit: contain;
+            max-height: 85vh; 
+        }
+
+    </style>
+</head>
+<body>
+    
+    <div id="bgm-toggle">♪</div>
+
+    <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true">
+        <defs>
+            <filter id="erosion" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" result="noise" />
+                <feColorMatrix type="matrix" 
+                    values="1 0 0 0 0  
+                            0 1 0 0 0  
+                            0 0 1 0 0  
+                            0 0 0 20 0" 
+                    id="erosion-alpha" in="noise" result="eroded" />
+                <feComposite operator="in" in="SourceGraphic" in2="eroded" />
+            </filter>
+        </defs>
+    </svg>
+
+    <canvas id="ambient-snow"></canvas>
+    
+    <div id="intro-screen">
+        <div id="start-container">
+            <div id="start-pointer-wrapper" id="start-pointer-wrapper">
+                <img src="Start.png" id="start-pointer" onclick="startJourney()" alt="Start">
+            </div>
+            <div id="intro-data-panel"></div>
+        </div>
+        
+        <svg id="golden-path-svg">
+            <defs>
+                <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffffff" />
+                    <stop offset="100%" stop-color="#fff8dc" />
+                </linearGradient>
+            </defs>
+        </svg>
+        <div id="stars-container"></div>
+    </div>
+
+    <div id="ice-fog"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <div id="prev-btn" class="nav-btn" onclick="prevPage()">❮</div>
+    <div id="next-btn" class="nav-btn" onclick="nextPage()">❯</div>
+
+    <div id="main-stage">
+        <div style="position: absolute; width:100%; height:100%; top:0; left:0; z-index:-1; background: url('background.png') center center / cover no-repeat; opacity: 0.93;"></div>
+        
+        <div id="book-wrapper">
+            <div class="book" id="my-book"></div>
+            
+            <div id="final-cover" style="
+                position: absolute; width: 420px; height: 100%; left: 50%; top: 0; transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(8px);
+                border: 1px solid rgba(147, 197, 253, 0.35);
+                border-left: 5px solid rgba(147, 197, 253, 0.5);
+                display: none; flex-direction: column; align-items: center; justify-content: flex-start;
+                padding-top: 80px; opacity: 0; transition: opacity 1.5s ease;
+                box-shadow: 0 0 40px rgba(147, 197, 253, 0.15);
+            ">
+                <h1 id="cover-title" style="font-size: 38px; font-weight: 300; letter-spacing: 20px; color: #fff; margin-bottom: 40px; margin-left: 20px; opacity: 0; transition: opacity 2s ease;">无人之境</h1>
+                
+                <div id="cover-line-container" style="width: 380px; height: 220px; margin: 0 auto 40px auto; opacity: 0; transition: opacity 2s ease;">
+                    <img src="15stars.png" style="width: 100%; height: 100%; object-fit: contain; transform: scale(1.8); transform-origin: center; filter: drop-shadow(0 0 10px rgba(255, 250, 230, 0.5));" alt="cover line">
+                </div>
+                <p id="cover-author" style="color:rgba(255,255,255,0.7); font-size: 16px; letter-spacing: 6px; line-height: 2.2; text-align: center; opacity: 0; transition: opacity 2s ease;">冒险家<br>Tobi Yu</p>
+            </div>
+        </div>
+
+        <div id="center-ending-container">
+            <p style="color:#fff; opacity:0.9; letter-spacing:4px; font-size:14px; margin-bottom:15px;">前方无径 · 天地沉寂</p>
+            <h3 style="color:#fff; font-weight:bold; text-shadow: 0 0 15px rgba(255,255,255,0.6); letter-spacing:6px; font-size:26px; margin-bottom: 45px;">恭喜，你已踏足山巅</h3>
+            <div class="choice-btn" onclick="chooseAdventure()">
+                <div class="four-point-star" style="width:10px; height:10px; background:#fff; margin:0;"></div>
+                <span>解锁成就：冒险家！</span>
+            </div>
+            <div class="choice-btn" onclick="chooseTheEnd()">
+                <div class="four-point-star" style="width:10px; height:10px; background:#fff; margin:0;"></div>
+                <span>环顾四周：终点在？</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="rest-btn" onclick="restAndRestart()">此间风雪渐停</div>
+
+    <div id="zoom-overlay">
+        <canvas id="snow-canvas"></canvas>
+        <div id="floating-mountain-target"></div>
+        <div id="cloud-text-container"></div>
+        <div class="btn-close" onclick="exitZoomMode()">回望群山</div>
+    </div>
+
+    <div id="final-universe-overlay">
+        <canvas id="universe-stars-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; transition: opacity 2s ease; z-index: 1;"></canvas>
+        
+        <div id="giant-mountain-nest" style="z-index: 2;"></div>
+        
+        <div id="poem-box">
+            <p>万山皆过，你是世间最高峰</p>
+            <p>放风雪归山，拥万物入怀</p>
+            <p>祝</p>
+            <p>生日快乐，步步平安</p>
+        </div>
+
+        <div id="cake-svg" style="position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%); opacity: 0; transition: opacity 2.5s ease; z-index: 20; pointer-events: none;">
+            <img src="Cake.png" class="interactive-cake" onclick="blowCake()" alt="Cake">
+        </div>
+    </div>
+    
+    <div id="blackout-overlay"></div>
+    <canvas id="blizzard-canvas"></canvas>
+    <div id="whiteout-overlay"></div>
+    <div id="water-drop"></div>
+    <div id="water-ripple">
+        <div class="ripple-arc arc-1"></div>
+        <div class="ripple-arc arc-2"></div>
+        <div class="ripple-arc arc-3"></div>
+        <div class="ripple-arc arc-4"></div>
+    </div>
+
+    <div id="glowing-cursor"></div>
+    <div id="letter-overlay">
+        <div id="letter-wrapper">
+            <img id="letter-img" src="" alt="Letter">
+        </div>
+    </div>
+
+    <script>
+        // 音频资源初始化
+        const sfxBGM = new Audio('Flight From The City.mp3');
+        sfxBGM.loop = true;
+        const sfxStart = new Audio('Vstart.mp3');
+        const sfxLetter = new Audio('Vletter.mp3');
+        const sfxNext = new Audio('Vnextpage.mp3');
+        const sfxSnow = new Audio('Vsnow.mp3');
+        const sfxWater = new Audio('Vwater.mp3');
+        let currentWind = null;
+
+        // BGM 控制
+        document.getElementById('bgm-toggle').addEventListener('click', function() {
+            if (sfxBGM.paused) {
+                sfxBGM.play();
+                this.classList.add('playing');
+            } else {
+                sfxBGM.pause();
+                this.classList.remove('playing');
+            }
+        });
+
+        // 修正：新增 zoomCoords 字段用来独立控制每座山详情页那3个文字的位置
+        const mountainMatrix = [
+            { id: 1,  title: "<山中之王> · 4478m", type: "type-crystal", text: "这里的高度不足5000米，但它在阿尔卑斯登山史里的地位却很难被代替。", zoomTexts: ["*马特洪峰 Matterhorn* ", "*位于瑞士/意大利交界*", "*4478米*"], zoomCoords: [{left: '50%', top: '15%'}, {left: '38%', top: '28%'}, {left: '60%', top: '35%'}] },
+            { id: 2,  title: "<东方阿尔卑斯> · 5025m", type: "type-frosted", text: "这里是许多人认识雪山的起点，也是从这里开始去逐渐熟悉高海拔环境下那个陌生而真实的自己。", zoomTexts: ["*四姑娘山·大峰 Mt.Siguniang*", "*位于中国四川*", "*5025米*"], zoomCoords: [{left: '53%', top: '10%'}, {left: '32%', top: '33%'}, {left: '70%', top: '27%'}] },
+            { id: 3,  title: "<初级界碑> · 5396m", type: "type-obsidian", text: "这里常被视作进阶路上的第一块里程碑。最后那段斜坡的风尤其大，毕竟每一座能被称为“雪山”的峰峦都有自己的脾气嘛。", zoomTexts: ["*哈巴雪山 Haba Snow Mountain*", "*位于中国云南*", "*5396米*"], zoomCoords: [{left: '50%', top: '4%'}, {left: '30%', top: '28%'}, {left: '68%', top: '20%'}] },
+            { id: 4,  title: "<贡嘎观景台> · 5588m", type: "type-crystal", text: "这里登顶之后便能与贡嘎隔空相望。这样想来攀登也是一种奇妙的杠杆，给予了小小人类一个身不可及的视角去注视那些更宏大的存在。", zoomTexts: ["*那玛峰 Nama Peak*", "*位于中国四川*", "*5588米*"], zoomCoords: [{left: '50%', top: '10%'}, {left: '41%', top: '30%'}, {left: '73%', top: '17%'}] },
+            { id: 5,  title: "<昆仑门户> · 6178m", type: "type-frosted", text: "这里是昆仑山东段的最高点。听说专注力被放大的时候感知也会被放大，比如说：嗯？6000米之后连空气的质感好像都不一样了哎！", zoomTexts: ["*玉珠峰 Yuzhu Peak*", "*位于中国青海*", "*6178米*"], zoomCoords: [{left: '65%', top: '15%'}, {left: '30%', top: '22%'}, {left: '70%', top: '25%'}] },
+            { id: 6,  title: "<母亲的项链> · 6812m", type: "type-obsidian", text: "这里被公认为世界上最美的山峰之一，两边的冰川如同展开的双臂，不过它的难度可完全没有拥抱每位攀登者的意思哦。", zoomTexts: ["*阿玛达布拉姆峰 Ama Dablam*", "*位于尼泊尔*", "*6812米*"], zoomCoords: [{left: '52%', top: '5%'}, {left: '28%', top: '35%'}, {left: '64%', top: '22%'}] },
+            { id: 7,  title: "<冰山之父> · 7546m", type: "type-crystal", text: "这里是你提到过的某座雪山，巨大而厚重的体量感正如其名。都说这是攀登路上绕不开的里程碑，那就直接翻越它吧～", zoomTexts: ["*慕士塔格峰 Muztagh Ata*", "*位于中国新疆*", "*7546米*"], zoomCoords: [{left: '50%', top: '8%'}, {left: '25%', top: '45%'}, {left: '64%', top: '23%'}] },
+            { id: 8,  title: "<闪光的山峰> · 8035m", type: "type-frosted", text: "这里有一种干燥、凛冽的荒原感，只要专心呼吸就能和自然对话。", zoomTexts: ["*加舒尔布鲁木II峰 Gasherbrum II*", "*位于中国/巴基斯坦交界*", "*8035米*"], zoomCoords: [{left: '51%', top: '9%'}, {left: '27%', top: '22%'}, {left: '78%', top: '38%'}] },
+            { id: 9,  title: "<宽峰> · 8051m", type: "type-obsidian", text: "这里的顶峰是一条很长很长的山脊，K2在对面清晰可见。原来你走了那么远，远到K2已经近在咫尺了！真的超——级厉害啊～！", zoomTexts: ["*布罗德峰 Broad Peak*", "*位于中国/巴基斯坦交界*", "*8051米*"], zoomCoords: [{left: '50%', top: '8%'}, {left: '35%', top: '22%'}, {left: '70%', top: '32%'}] },
+            { id: 10, title: "<丰收的女神> · 8091m", type: "type-crystal", text: "这里在登山史上有着极高的死亡率，然而它的名字却这么温柔。", zoomTexts: ["*安纳普尔纳I峰 Annapurna I*", "*位于尼泊尔*", "*8091米*"], zoomCoords: [{left: '51%', top: '5%'}, {left: '53%', top: '35%'}, {left: '50%', top: '43%'}] },
+            { id: 11, title: "<杀手峰> · 8126m", type: "type-frosted", text: "这里的鲁泊尔岩壁是世界上海拔落差最大的岩壁。凝视如此极致的垂直，直面震撼的同时也是在直面恐惧。", zoomTexts: ["*南迦帕尔巴特峰 Nanga Parbat*", "*位于巴基斯坦*", "*8126米*"], zoomCoords: [{left: '51%', top: '8%'}, {left: '50%', top: '40%'}, {left: '50%', top: '58%'}] },
+            { id: 12, title: "<神灵之山> · 8163m", type: "type-obsidian", text: "这里的商业开发已经让它的难度曲线相对平滑，但在8000米海拔之上没有真正意义上的轻松。保持呼吸，继续前进。", zoomTexts: ["*马纳斯鲁峰 Manaslu*", "*位于尼泊尔*", "*8163米*"], zoomCoords: [{left: '49%', top: '7%'}, {left: '33%', top: '25%'}, {left: '68%', top: '25%'}] },
+            { id: 13, title: "<首席尊师> · 8201m", type: "type-crystal", text: "这里被认为是最友善的8000米级别雪山，然而这个不容忽视的高度依然时刻要求每位攀登者关注任何一个来自身体或环境的细微变化。", zoomTexts: ["*卓奥友峰 Cho Oyu*", "*位于中国/尼泊尔交界*", "*8021米*"], zoomCoords: [{left: '50%', top: '7%'}, {left: '30%', top: '22%'}, {left: '77%', top: '37%'}] },
+            { id: 14, title: "<野蛮之峰> · 8611m", type: "type-frosted", text: "这里是无数人仰望却不敢触碰的“山巅”。不过山也只是山，山一直都在那里。所以去或不去其实都是好的，你的梦不会成真，梦想都会实现。", zoomTexts: ["*乔戈里峰 K2*", "*位于中国/巴基斯坦交界*", "*8611米*"], zoomCoords: [{left: '52%', top: '4%'}, {left: '30%', top: '25%'}, {left: '66%', top: '20%'}] },
+            { id: 15, title: "<圣母之峰> · 8848.86m", type: "type-obsidian", text: "这里是物理意义上的最高点。有些好奇，你登顶时目之所及的是什么呢？或许只是一如既往的云层和群山...但一步一步走到这里的你，大概已经拥有了比这些更珍贵的东西吧。真好！由衷为你开心～！", zoomTexts: ["*珠穆朗玛峰 Mount Everest*", "*位于中国/尼泊尔交界*", "*8848.86米*"], zoomCoords: [{left: '51%', top: '6%'}, {left: '35%', top: '20%'}, {left: '69%', top: '33%'}] }
+        ];
+
+        const mountainData = mountainMatrix.map(m => m.title.replace('<', '').replace('>', '').split(' · ')[0] + ' · ' + m.title.split(' · ')[1] || m.title);
+        
+        function initDataPanel() {
+            const dataPanel = document.getElementById('intro-data-panel');
+            dataPanel.innerHTML = '';
+            // 为了向下兼容，把 matrix 还原为原来的文字显示
+            const dataStrings = [
+                "Mount Everest · 8,848.86", "K2 · 8,611", "Cho Oyu · 8,201", "Manaslu · 8,163", "Nanga Parbat · 8,126",
+                "Annapurna I · 8,091", "Broad Peak · 8,051", "Gasherbrum II · 8,035", "Muztagh Ata · 7,546", "Ama Dablam · 6,812",
+                "Yuzhu Peak · 6,178", "Nama Peak · 5,588", "Haba Snow Mountain · 5,396", "Mt. Siguniang (Dafeng) · 5,025", "Matterhorn · 4,478"
+            ];
+
+            dataStrings.forEach((text, i) => {
+                const delay = (dataStrings.length - 1 - i) * 0.15; 
+                const line = document.createElement('div');
+                line.className = 'data-line';
+                line.style.animationDelay = `${delay}s`;
+                line.innerText = text;
+
+                if (text === "K2 · 8,611") {
+                    line.classList.add('k2-line');
+                    const cursor = document.getElementById('glowing-cursor');
+
+                    line.addEventListener('mouseenter', () => { cursor.style.opacity = '1'; });
+                    line.addEventListener('mouseleave', () => { cursor.style.opacity = '0'; });
+                    line.addEventListener('mousemove', (e) => {
+                        cursor.style.left = e.clientX + 'px';
+                        cursor.style.top = e.clientY + 'px';
+                    });
+                    line.addEventListener('click', startLetterSequence);
+                }
+                
+                dataPanel.appendChild(line);
+            });
+        }
+        initDataPanel();
+
+        let currentLetterStep = 0;
+        const letterImages = ['letter1.png', 'letter2.png', 'letter3.png'];
+        const letterSizes = ['20vw', '35vw', '50vw']; 
+        let isEroding = false; 
+
+        function startLetterSequence() {
+            sfxLetter.currentTime = 0;
+            sfxLetter.play();
+
+            currentLetterStep = 0;
+            const overlay = document.getElementById('letter-overlay');
+            const img = document.getElementById('letter-img');
+            const wrapper = document.getElementById('letter-wrapper');
+            
+            isEroding = false;
+            wrapper.style.filter = 'none';
+            document.getElementById('erosion-alpha').setAttribute('values', '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 5');
+            img.style.opacity = '1';
+            
+            img.src = letterImages[currentLetterStep];
+            img.style.width = letterSizes[currentLetterStep];
+            
+            overlay.style.display = 'flex';
+            void overlay.offsetWidth; 
+            overlay.style.opacity = '1';
+        }
+
+        document.getElementById('letter-overlay').addEventListener('click', function() {
+            if (isEroding) return; 
+            sfxLetter.currentTime = 0;
+            sfxLetter.play();
+
+            currentLetterStep++;
+            const img = document.getElementById('letter-img');
+            
+            if (currentLetterStep < 3) {
+                img.src = letterImages[currentLetterStep];
+                img.style.width = letterSizes[currentLetterStep];
+            } else if (currentLetterStep === 3) {
+                triggerErosion();
+            }
+        });
+
+        function triggerErosion() {
+            isEroding = true;
+            const wrapper = document.getElementById('letter-wrapper');
+            const overlay = document.getElementById('letter-overlay');
+            const alphaMatrix = document.getElementById('erosion-alpha');
+            
+            wrapper.style.filter = 'url(#erosion)';
+            
+            let erosionProgress = 5; 
+            
+            function erodeFrame() {
+                erosionProgress -= 0.12; 
+                alphaMatrix.setAttribute('values', `1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 ${erosionProgress}`);
+                
+                if (erosionProgress > -25) {
+                    requestAnimationFrame(erodeFrame);
+                } else {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 2500); 
+                }
+            }
+            
+            erodeFrame();
+        }
+
+        const ambientSnowCanvas = document.getElementById('ambient-snow');
+        const ambientSnowCtx = ambientSnowCanvas.getContext('2d');
+        let ambientSnowflakes = [];
+        let starFieldFrame;
+
+        function initAmbientSnow() {
+            ambientSnowCanvas.width = window.innerWidth; ambientSnowCanvas.height = window.innerHeight;
+            ambientSnowflakes = [];
+            for(let i=0; i<85; i++) {
+                ambientSnowflakes.push({
+                    x: Math.random() * ambientSnowCanvas.width,
+                    y: Math.random() * ambientSnowCanvas.height,
+                    r: Math.random() * 0.8 + 0.2, 
+                    d: Math.random() * 2,
+                    speed: Math.random() * 0.08 + 0.02 
+                });
+            }
+        }
+        function drawAmbientSnow() {
+            ambientSnowCtx.clearRect(0, 0, ambientSnowCanvas.width, ambientSnowCanvas.height);
+            ambientSnowCtx.fillStyle = "rgba(255, 255, 255, 0.8)"; 
+            ambientSnowCtx.beginPath();
+            for(let i=0; i<ambientSnowflakes.length; i++) {
+                let f = ambientSnowflakes[i];
+                ambientSnowCtx.moveTo(f.x, f.y);
+                ambientSnowCtx.arc(f.x, f.y, f.r, 0, Math.PI*2, true);
+                f.y += f.speed;
+                f.x += Math.sin(f.d) * 0.06; 
+                if(f.y > ambientSnowCanvas.height) {
+                    ambientSnowflakes[i] = { x: Math.random()*ambientSnowCanvas.width, y: 0, r: f.r, d: f.d, speed: f.speed };
+                }
+            }
+            ambientSnowCtx.fill();
+            requestAnimationFrame(drawAmbientSnow);
+        }
+        window.addEventListener('resize', () => {
+            ambientSnowCanvas.width = window.innerWidth; ambientSnowCanvas.height = window.innerHeight;
+        });
+        initAmbientSnow(); drawAmbientSnow();
+
+        const bookContainer = document.getElementById('my-book');
+        const bookWrapper = document.getElementById('book-wrapper');
+        let currentSheetIndex = 1; 
+        let isBookDissolved = false; 
+        let isRestMode = false; 
+        let sheets;
+
+        function renderBook() {
+            bookContainer.innerHTML = '';
+            
+            const sheet0 = document.createElement('div');
+            sheet0.className = 'sheet flipped'; 
+            sheet0.style.zIndex = mountainMatrix.length + 10;
+            sheet0.innerHTML = `
+                <div class="page-face front" style="background:transparent; border:none; backdrop-filter:none; box-shadow:none;"></div>
+                <div class="page-face back shadow-left-page">
+                    <div class="left-page-content">
+                        <img src="m1.png" class="mountain-img" onclick="enterZoomMode(0)" draggable="false" alt="Mountain 1">
+                    </div>
+                </div>
+            `;
+            bookContainer.appendChild(sheet0);
+
+            for(let i = 1; i < mountainMatrix.length; i++) {
+                const sheet = document.createElement('div');
+                sheet.className = 'sheet';
+                sheet.innerHTML = `
+                    <div class="page-face front">
+                        <div class="right-page-content">
+                            <h2>${mountainMatrix[i-1].title}</h2>
+                            <p>${mountainMatrix[i-1].text}</p>
+                        </div>
+                    </div>
+                    <div class="page-face back shadow-left-page">
+                        <div class="left-page-content">
+                            <img src="m${i+1}.png" class="mountain-img" onclick="enterZoomMode(${i})" draggable="false" alt="Mountain ${i+1}">
+                        </div>
+                    </div>
+                `;
+                bookContainer.appendChild(sheet);
+            }
+
+            const sheet15 = document.createElement('div');
+            sheet15.className = 'sheet';
+            sheet15.innerHTML = `
+                <div class="page-face front">
+                    <div class="right-page-content">
+                        <h2>${mountainMatrix[14].title}</h2>
+                        <p>${mountainMatrix[14].text}</p>
+                    </div>
+                </div>
+                <div class="page-face back" style="background:transparent; border:none; backdrop-filter:none; box-shadow:none;"></div>
+            `;
+            bookContainer.appendChild(sheet15);
+
+            sheets = document.querySelectorAll('.sheet');
+            sheets.forEach(sheet => {
+                sheet.addEventListener('transitionend', (e) => {
+                    if (e.propertyName === 'transform' && !isBookDissolved && !isRestMode) {
+                        updateBookLayout(); 
+                    }
+                });
+            });
+            updateBookLayout();
+        }
+        
+        renderBook();
+
+        function updateBookLayout(animatingSheet = null) {
+            if (isBookDissolved || isRestMode) return; 
+
+            sheets.forEach((sheet, idx) => {
+                const isFlipped = sheet.classList.contains('flipped');
+                
+                if (animatingSheet === sheet) {
+                    sheet.style.zIndex = 10000;
+                } else {
+                    sheet.style.zIndex = isFlipped ? (idx + 10) : (sheets.length - idx + 10);
+                }
+
+                sheet.style.opacity = "1";
+                sheet.style.visibility = "visible";
+                sheet.style.pointerEvents = (idx === currentSheetIndex || (isFlipped && idx === currentSheetIndex - 1)) ? "auto" : "none";
+                sheet.style.transition = "transform 1.3s cubic-bezier(0.4, 0, 0.2, 1)";
+
+                const backFace = sheet.querySelector('.page-face.back');
+                if (backFace) {
+                    backFace.style.transition = "box-shadow 0.8s ease"; 
+                    backFace.style.boxShadow = "none"; 
+                }
+            });
+
+            if (currentSheetIndex <= 1) {
+                document.getElementById('prev-btn').style.opacity = "0";
+                document.getElementById('prev-btn').style.pointerEvents = "none";
+            } else {
+                document.getElementById('prev-btn').style.opacity = "1";
+                document.getElementById('prev-btn').style.pointerEvents = "auto";
+            }
+            
+            if(bookWrapper.style.opacity === "1") {
+                document.getElementById('next-btn').style.opacity = "1";
+                document.getElementById('next-btn').style.pointerEvents = "auto";
+            }
+        }
+
+        function startJourney() {
+            sfxStart.currentTime = 0;
+            sfxStart.play();
+
+            document.getElementById('start-container').style.opacity = '0';
+            setTimeout(() => { document.getElementById('start-container').style.pointerEvents = 'none'; }, 1000);
+            
+            const svg = document.getElementById('golden-path-svg');
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            
+            const d = `M ${w*0.80} ${h*0.95} 
+                       L ${w*0.72} ${h*0.92} 
+                       L ${w*0.65} ${h*0.88} 
+                       L ${w*0.58} ${h*0.90} 
+                       L ${w*0.50} ${h*0.85} 
+                       L ${w*0.45} ${h*0.78} 
+                       L ${w*0.48} ${h*0.76} 
+                       L ${w*0.40} ${h*0.68} 
+                       L ${w*0.45} ${h*0.65} 
+                       L ${w*0.38} ${h*0.58} 
+                       L ${w*0.42} ${h*0.55} 
+                       L ${w*0.35} ${h*0.42}`;
+            
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', 'url(#gold-grad)');
+            path.setAttribute('stroke-width', '1.5'); 
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.style.filter = 'drop-shadow(0 0 8px rgba(255, 250, 230, 0.9))'; 
+            
+            svg.appendChild(path);
+            
+            const length = path.getTotalLength();
+            path.style.strokeDasharray = length;
+            path.style.strokeDashoffset = length;
+            
+            path.getBoundingClientRect(); 
+            path.style.transition = 'stroke-dashoffset 4.2s linear';
+            path.style.strokeDashoffset = '0';
+            
+            const starsContainer = document.getElementById('stars-container');
+            for(let i=0; i<15; i++) {
+                const pt = path.getPointAtLength(length * (i / 14));
+                const star = document.createElement('div');
+                star.className = 'path-star' + (i === 14 ? ' bright' : '');
+                star.style.left = pt.x + 'px';
+                star.style.top = pt.y + 'px';
+                starsContainer.appendChild(star);
+                
+                setTimeout(() => {
+                    star.classList.add('active');
+                }, (4200 * (i / 14)) + 100);
+            }
+            
+            setTimeout(() => {
+                svg.style.transition = 'opacity 1.5s ease';
+                svg.style.opacity = '0';
+                starsContainer.style.transition = 'opacity 1.5s ease';
+                starsContainer.style.opacity = '0';
+                
+                document.getElementById('intro-screen').style.pointerEvents = 'none';
+                
+                startSnowFormation();
+            }, 5500); 
+        }
+
+        let particleFrame;
+        function startSnowFormation() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.style.opacity = "1";
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            let particles = [];
+            for (let i = 0; i < 300; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height, 
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: Math.random() * 2 + 1.5,
+                    size: Math.random() * 1.8 + 0.5,
+                    alpha: Math.random() * 0.8 + 0.2
+                });
+            }
+            
+            let startTime = Date.now();
+            let fadingOut = false; 
+            
+            bookWrapper.style.transition = "none";
+            bookWrapper.style.opacity = "0";
+            bookWrapper.style.transform = "scale(0.7)";
+            
+            const fog = document.getElementById('ice-fog');
+            fog.style.opacity = '1';
+
+            setTimeout(() => {
+                bookWrapper.style.transition = "none";
+                bookWrapper.style.opacity = "1"; 
+                bookWrapper.style.transform = "scale(0.7)";
+                
+                setTimeout(() => {
+                    fog.style.opacity = '0';
+                    bookWrapper.style.transition = "transform 3s cubic-bezier(0.25, 1, 0.5, 1)";
+                    bookWrapper.style.transform = "scale(1)";
+                }, 100);
+            }, 1500);
+
+            setTimeout(() => {
+                bookWrapper.style.pointerEvents = "auto";
+                document.getElementById('next-btn').style.opacity = "1";
+                document.getElementById('next-btn').style.pointerEvents = "auto";
+            }, 4500);
+            
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let elapsed = Date.now() - startTime;
+                
+                if (elapsed > 5500 && !fadingOut) {
+                    fadingOut = true;
+                    canvas.style.opacity = "0"; 
+                }
+                
+                particles.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+                    ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                });
+                
+                if (elapsed < 8000) {
+                    particleFrame = requestAnimationFrame(render);
+                } else {
+                    cancelAnimationFrame(particleFrame);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                }
+            }
+            render();
+        }
+
+        function nextPage() {
+            if (isBookDissolved || isRestMode) return; 
+            if (currentSheetIndex === sheets.length - 1) {
+                sfxNext.currentTime = 0; sfxNext.play();
+                triggerEndingDissolve();
+                return;
+            }
+            if (currentSheetIndex < sheets.length) {
+                sfxNext.currentTime = 0; sfxNext.play();
+                let turningSheet = sheets[currentSheetIndex];
+                turningSheet.classList.add('flipped');
+                currentSheetIndex++;
+                updateBookLayout(turningSheet);
+            }
+        }
+
+        function prevPage() {
+            if (isBookDissolved || isRestMode) return; 
+            if (currentSheetIndex > 1) { 
+                sfxNext.currentTime = 0; sfxNext.play();
+                currentSheetIndex--;
+                let turningSheet = sheets[currentSheetIndex];
+                turningSheet.classList.remove('flipped');
+                updateBookLayout(turningSheet);
+            }
+        }
+
+        let endingParticles = [];
+        function triggerEndingDissolve() {
+            isBookDissolved = true;
+            document.getElementById('prev-btn').style.opacity = "0";
+            document.getElementById('prev-btn').style.pointerEvents = "none";
+            document.getElementById('next-btn').style.opacity = "0";
+            document.getElementById('next-btn').style.pointerEvents = "none";
+
+            const allSheets = document.querySelectorAll('.sheet');
+            allSheets.forEach((s, idx) => {
+                if (idx !== currentSheetIndex && idx !== currentSheetIndex - 1) {
+                    s.style.display = "none";
+                }
+            });
+
+            const particleCanvas = document.getElementById('particle-canvas');
+            const pCtx = particleCanvas.getContext('2d');
+            particleCanvas.style.transition = "opacity 0.5s ease";
+            particleCanvas.style.opacity = "1";
+            particleCanvas.width = window.innerWidth;
+            particleCanvas.height = window.innerHeight;
+
+            const rect = bookWrapper.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            endingParticles = [];
+            for(let i=0; i<1500; i++) {
+                endingParticles.push({
+                    x: centerX + (Math.random() - 0.5) * rect.width,
+                    y: centerY + (Math.random() - 0.5) * rect.height,
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: (Math.random() - 1.0) * 1.5,
+                    alpha: Math.random() * 0.8 + 0.2, 
+                    size: Math.random() * 1.5 + 0.5,  
+                    decay: Math.random() * 0.003 + 0.001
+                });
+            }
+
+            bookWrapper.style.transition = "opacity 2.5s ease, transform 2.5s ease";
+            bookWrapper.style.transform = "scale(0.95)";
+            bookWrapper.style.opacity = "0";
+
+            function animateEndingParticles() {
+                if (!isBookDissolved) return; 
+                pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+                let alive = false;
+                endingParticles.forEach(p => {
+                    if (p.alpha > 0) {
+                        alive = true;
+                        pCtx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+                        pCtx.beginPath();
+                        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        pCtx.fill();
+                        p.x += p.vx; p.y += p.vy;
+                        p.alpha -= p.decay; 
+                    }
+                });
+                if (alive) particleFrame = requestAnimationFrame(animateEndingParticles);
+            }
+            animateEndingParticles();
+
+            setTimeout(() => {
+                const centerEnding = document.getElementById('center-ending-container');
+                centerEnding.style.opacity = "1";
+                centerEnding.style.pointerEvents = "auto";
+            }, 3000);
+        }
+
+        const zoomOverlay = document.getElementById('zoom-overlay');
+        const mainStage = document.getElementById('main-stage');
+        const floatingTarget = document.getElementById('floating-mountain-target');
+        const textContainer = document.getElementById('cloud-text-container');
+        let zoomTextTimeout; 
+
+        function enterZoomMode(index) {
+            clearTimeout(zoomTextTimeout); 
+            floatingTarget.className = '';
+            floatingTarget.innerHTML = `<div id="parallax-wrapper" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease-out; transform-style: preserve-3d; perspective: 1500px;"><img src="m${index + 1}.png" style="width: 1200px; height: 1200px; max-width: 85vw; max-height: 85vh; object-fit: contain; filter: drop-shadow(0 0 20px rgba(255,255,255,0.4));" draggable="false" alt="Zoomed Mountain ${index + 1}"></div>`;
+            
+            // 修正：将伪3D效果精确绑定到山体图片容器自身，缩小判定范围并增加鼠标移出时的回位还原
+            const parallaxWrapper = document.getElementById('parallax-wrapper');
+            parallaxWrapper.addEventListener('mousemove', (e) => {
+                const xAxis = (window.innerWidth / 2 - e.pageX) / 40; 
+                const yAxis = (window.innerHeight / 2 - e.pageY) / 40;
+                const moveX = (window.innerWidth / 2 - e.pageX) / 50; 
+                const moveY = (window.innerHeight / 2 - e.pageY) / 50;
+                parallaxWrapper.style.transform = `translate(${moveX}px, ${moveY}px) rotateY(${xAxis}deg) rotateX(${-yAxis}deg)`;
+            });
+            parallaxWrapper.addEventListener('mouseleave', () => {
+                parallaxWrapper.style.transform = `translate(0px, 0px) rotateY(0deg) rotateX(0deg)`;
+            });
+
+            mainStage.style.transform = "scale(0.85)";
+            mainStage.style.filter = "blur(20px)";
+            mainStage.style.opacity = "0.25";
+            zoomOverlay.classList.add('active');
+            
+            generateIsolatedText(index);
+
+            // 音效判定
+            let windSrc = '';
+            if (index >= 0 && index <= 3) windSrc = 'Vwind1-4.mp3';
+            else if (index >= 4 && index <= 6) windSrc = 'Vwind5-7.wav';
+            else if (index >= 7 && index <= 12) windSrc = 'Vwind8-13.wav';
+            else if (index >= 13 && index <= 14) windSrc = 'Vwind14-15.mp3';
+
+            if (currentWind) {
+                currentWind.pause();
+                currentWind = null;
+            }
+            if (windSrc) {
+                currentWind = new Audio(windSrc);
+                currentWind.loop = true;
+                currentWind.play();
+            }
+        }
+
+        function exitZoomMode() {
+            mainStage.style.transform = "scale(1)";
+            mainStage.style.filter = "blur(0px)";
+            mainStage.style.opacity = "1";
+            updateBookLayout();
+            zoomOverlay.classList.remove('active');
+            
+            clearTimeout(zoomTextTimeout);
+            zoomTextTimeout = setTimeout(() => {
+                textContainer.innerHTML = '';
+            }, 1000);
+
+            if (currentWind) {
+                currentWind.pause();
+                currentWind = null;
+            }
+        }
+
+        // 修正：读取字典里专属该山的 zoomCoords 配置
+        function generateIsolatedText(index) {
+            textContainer.innerHTML = '';
+            
+            let phrases;
+            if (mountainMatrix[index].zoomTexts && mountainMatrix[index].zoomTexts.length > 0) {
+                phrases = mountainMatrix[index].zoomTexts;
+            } else {
+                phrases = mountainMatrix[index].text.split(/[，。？！]/).filter(p => p.trim().length > 0);
+            }
+            
+            const coords = mountainMatrix[index].zoomCoords;
+            
+            phrases.forEach((phrase, i) => {
+                if (i >= coords.length) return;
+                const textEl = document.createElement('div');
+                textEl.className = 'cloud-text';
+                textEl.innerText = phrase;
+                textEl.style.left = coords[i].left; 
+                textEl.style.top = coords[i].top;
+                
+                const fontSize = Math.floor(Math.random() * 6 + 12);
+                textEl.style.fontSize = `${fontSize}px`;
+                textEl.style.padding = `5px`; 
+
+                const delay = Math.random() * 2;
+                const duration = Math.random() * 3 + 5; 
+                textEl.style.animation = `cloudFloat ${duration}s ease-in-out infinite`;
+                textEl.style.animationDelay = `${delay}s`;
+
+                textContainer.appendChild(textEl);
+            });
+        }
+
+        function chooseAdventure() {
+            isRestMode = true; 
+            
+            document.getElementById('center-ending-container').style.opacity = "0";
+            document.getElementById('center-ending-container').style.pointerEvents = "none";
+            document.getElementById('next-btn').style.opacity = "0";
+            document.getElementById('next-btn').style.pointerEvents = "none";
+            document.getElementById('prev-btn').style.opacity = "0";
+            document.getElementById('prev-btn').style.pointerEvents = "none";
+            
+            const particleCanvas = document.getElementById('particle-canvas');
+            const pCtx = particleCanvas.getContext('2d');
+            particleCanvas.style.transition = "opacity 0.5s ease";
+            particleCanvas.style.opacity = "0";
+            
+            setTimeout(() => {
+                cancelAnimationFrame(particleFrame);
+                pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+                isBookDissolved = false;
+            }, 500);
+
+            bookWrapper.style.transition = "opacity 1s ease"; 
+            bookWrapper.style.opacity = "0";
+
+            setTimeout(() => {
+                bookWrapper.style.transform = "scale(0.85)"; 
+                
+                document.getElementById('my-book').style.display = 'none';
+                const finalCover = document.getElementById('final-cover');
+                finalCover.style.display = 'flex';
+
+                requestAnimationFrame(() => {
+                    bookWrapper.style.transition = "opacity 2s ease"; 
+                    bookWrapper.style.opacity = "1";
+
+                    setTimeout(() => {
+                        finalCover.style.opacity = "1";
+                        
+                        setTimeout(() => {
+                            const title = document.getElementById('cover-title');
+                            if (title) title.style.opacity = "1";
+                            
+                            setTimeout(() => {
+                                const line = document.getElementById('cover-line-container');
+                                if (line) line.style.opacity = "1";
+                                
+                                setTimeout(() => {
+                                    const author = document.getElementById('cover-author');
+                                    if (author) author.style.opacity = "1";
+                                    
+                                    setTimeout(() => {
+                                        const restBtn = document.getElementById('rest-btn');
+                                        restBtn.style.opacity = "1";
+                                        restBtn.style.pointerEvents = "auto";
+                                    }, 1500);
+                                }, 1500);
+                            }, 1500);
+                        }, 1500);
+                    }, 500);
+                });
+            }, 1000); 
+        }
+
+        function performCommonReset() {
+            isBookDissolved = false; 
+            isRestMode = false;
+            currentSheetIndex = 1;
+
+            if (currentWind) {
+                currentWind.pause();
+                currentWind = null;
+            }
+
+            const startContainer = document.getElementById('start-container');
+            startContainer.style.transition = 'none';
+            startContainer.style.opacity = '0';
+            startContainer.style.pointerEvents = 'auto'; 
+            
+            const pointerWrapper = document.getElementById('start-pointer-wrapper');
+            if (pointerWrapper) {
+                pointerWrapper.style.animation = 'none';
+                pointerWrapper.style.opacity = '0';
+            }
+            document.getElementById('intro-data-panel').innerHTML = ''; 
+
+            const letterOverlay = document.getElementById('letter-overlay');
+            if (letterOverlay) {
+                letterOverlay.style.opacity = '0';
+                letterOverlay.style.display = 'none';
+            }
+            isEroding = false;
+            
+            const finalCover = document.getElementById('final-cover');
+            if (finalCover) {
+                finalCover.style.opacity = "0";
+                finalCover.style.display = "none";
+                document.getElementById('cover-title').style.opacity = "0";
+                document.getElementById('cover-line-container').style.opacity = "0";
+                document.getElementById('cover-author').style.opacity = "0";
+            }
+            document.getElementById('my-book').style.display = "block";
+
+            bookWrapper.style.cssText = "position: relative; width: 900px; height: 550px; transform-style: preserve-3d; opacity: 0; transform: scale(0.7); pointer-events: none;";
+            document.getElementById('prev-btn').style.opacity = "0";
+            document.getElementById('prev-btn').style.pointerEvents = "none";
+            document.getElementById('next-btn').style.opacity = "0";
+            document.getElementById('next-btn').style.pointerEvents = "none";
+            
+            if (typeof particleFrame !== 'undefined') cancelAnimationFrame(particleFrame);
+            endingParticles = [];
+            const particleCanvas = document.getElementById('particle-canvas');
+            particleCanvas.style.transition = "none";
+            particleCanvas.style.opacity = "0";
+            particleCanvas.getContext('2d').clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            
+            if (typeof starFieldFrame !== 'undefined') cancelAnimationFrame(starFieldFrame);
+            const starCanvas = document.getElementById('universe-stars-canvas');
+            if (starCanvas) {
+                starCanvas.style.opacity = "0";
+                starCanvas.getContext('2d').clearRect(0, 0, starCanvas.width, starCanvas.height);
+            }
+
+            const fog = document.getElementById('ice-fog');
+            fog.style.transition = ""; 
+            fog.style.opacity = "0";
+
+            renderBook();
+
+            const centerEnding = document.getElementById('center-ending-container');
+            centerEnding.style.opacity = "0";
+            centerEnding.style.pointerEvents = "none";
+            
+            mainStage.style.transform = "scale(1)";
+            mainStage.style.filter = "none";
+            mainStage.style.opacity = "1";
+            
+            const finalUniverse = document.getElementById('final-universe-overlay');
+            finalUniverse.style.transition = "none";
+            finalUniverse.classList.remove('active');
+            void finalUniverse.offsetWidth; 
+            finalUniverse.style.transition = "opacity 2s ease"; 
+            
+            document.getElementById('giant-mountain-nest').innerHTML = '';
+            
+            const cakeSvg = document.getElementById('cake-svg');
+            cakeSvg.style.opacity = "0";
+            cakeSvg.style.pointerEvents = "none";
+            const cakeImg = document.querySelector('.interactive-cake');
+            if(cakeImg) {
+                cakeImg.style.removeProperty('filter');
+                cakeImg.style.transition = "filter 0.5s ease, transform 0.5s ease, opacity 1.5s ease";
+                cakeImg.style.transform = "scale(1)";
+                cakeImg.style.opacity = "1"; 
+                cakeImg.style.pointerEvents = "";
+            }
+
+            const poemLines = document.querySelectorAll('#poem-box p');
+            poemLines.forEach(line => {
+                line.style.transition = "none";
+                line.style.filter = "blur(3px)";
+                line.style.color = "rgba(255,255,255,0)";
+                line.style.textShadow = "none";
+                void line.offsetWidth; 
+                line.style.transition = "color 2s ease, filter 2s ease";
+            });
+            
+            const introScreen = document.getElementById('intro-screen');
+            introScreen.style.opacity = "1";
+            introScreen.style.pointerEvents = "auto";
+            
+            const svg = document.getElementById('golden-path-svg');
+            svg.style.transition = "none";
+            svg.style.opacity = "1";
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ffffff" />
+                        <stop offset="100%" stop-color="#fff8dc" />
+                    </linearGradient>
+                </defs>
+            `;
+            document.getElementById('stars-container').style.transition = "none";
+            document.getElementById('stars-container').innerHTML = '';
+            document.getElementById('stars-container').style.opacity = "1";
+        }
+
+        function triggerHomeAnimations() {
+            const startContainer = document.getElementById('start-container');
+            startContainer.style.transition = 'opacity 1s ease';
+            startContainer.style.opacity = '1';
+            
+            initDataPanel(); 
+            const pointerWrapper = document.getElementById('start-pointer-wrapper');
+            pointerWrapper.style.animation = 'none';
+            void pointerWrapper.offsetWidth; 
+            pointerWrapper.style.animation = 'startPointerEnter 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+            pointerWrapper.style.animationDelay = '2.5s'; 
+        }
+        
+        function restAndRestart() {
+            const blackout = document.getElementById('blackout-overlay');
+            const restBtn = document.getElementById('rest-btn');
+            const drop = document.getElementById('water-drop');
+            const ripple = document.getElementById('water-ripple');
+            
+            document.body.classList.add('layout-locked');
+            restBtn.style.opacity = "0";
+            restBtn.style.pointerEvents = "none";
+            blackout.style.transition = "opacity 2s ease";
+            blackout.style.opacity = "1";
+            
+            setTimeout(() => {
+                performCommonReset();
+
+                drop.style.transition = "none";
+                drop.style.top = "-5%";
+                drop.style.opacity = "1";
+                drop.style.height = "15px";
+                
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        drop.style.transition = "top 1.6s cubic-bezier(0.4, 0, 1, 1), opacity 0.4s ease 1.2s";
+                        drop.style.top = "50%";
+                        drop.style.opacity = "0";
+                    });
+                });
+                
+                setTimeout(() => {
+                    ripple.classList.remove('expanding');
+                    void ripple.offsetWidth; 
+                    ripple.classList.add('expanding');
+                    
+                    // 水滴滴落、涟漪展开瞬间播放音效
+                    sfxWater.currentTime = 0;
+                    sfxWater.play();
+                    
+                    blackout.style.transition = "opacity 3.5s ease 0.2s"; 
+                    blackout.style.opacity = "0";
+
+                    triggerHomeAnimations();
+
+                    setTimeout(() => {
+                        document.body.classList.remove('layout-locked');
+                    }, 3700);
+                }, 1600); 
+                
+            }, 2100); 
+        }
+
+        // 修正：新增全局倍速变量和缓冲区间控制暴风雪减速
+        let blizzAnimation;
+        let blizzSpeedMult = 1;
+        let blizzSlowInterval;
+
+        function startBlizzard() {
+            sfxSnow.currentTime = 0;
+            sfxSnow.play();
+
+            blizzSpeedMult = 1;
+            if(blizzSlowInterval) clearInterval(blizzSlowInterval);
+
+            const blizzCanvas = document.getElementById('blizzard-canvas');
+            const blizzCtx = blizzCanvas.getContext('2d');
+            blizzCanvas.width = window.innerWidth;
+            blizzCanvas.height = window.innerHeight;
+            blizzCanvas.style.opacity = '1';
+            
+            let blizzParticles = [];
+            for(let i=0; i<1500; i++) {
+                blizzParticles.push({
+                    x: Math.random() * blizzCanvas.width,
+                    y: Math.random() * blizzCanvas.height,
+                    vx: (Math.random() * 30 + 15), 
+                    vy: (Math.random() * 15 + 10), 
+                    size: Math.random() * 3 + 0.5,
+                    alpha: Math.random() * 0.8 + 0.2,
+                    type: Math.random() > 0.35 ? 'line' : 'dot' 
+                });
+            }
+            function render() {
+                blizzCtx.clearRect(0,0,blizzCanvas.width, blizzCanvas.height);
+                blizzCtx.lineCap = 'round';
+                
+                blizzParticles.forEach(p => {
+                    blizzCtx.beginPath();
+                    if (p.type === 'line') {
+                        blizzCtx.strokeStyle = `rgba(255,255,255,${p.alpha})`;
+                        blizzCtx.lineWidth = p.size * 0.8;
+                        blizzCtx.moveTo(p.x, p.y);
+                        blizzCtx.lineTo(p.x - (p.vx * blizzSpeedMult) * 0.8, p.y - (p.vy * blizzSpeedMult) * 0.8);
+                        blizzCtx.stroke();
+                    } else {
+                        blizzCtx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+                        blizzCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        blizzCtx.fill();
+                    }
+
+                    p.x += p.vx * blizzSpeedMult;
+                    p.y += p.vy * blizzSpeedMult;
+                    if(p.y > blizzCanvas.height || p.x > blizzCanvas.width) {
+                        p.x = Math.random() * blizzCanvas.width * 2 - blizzCanvas.width * 0.8; 
+                        p.y = Math.random() * -100 - 50; 
+                    }
+                });
+                blizzAnimation = requestAnimationFrame(render);
+            }
+            render();
+        }
+
+        // 修正：提供减缓暴风雪的方法
+        function slowDownBlizzard() {
+            blizzSlowInterval = setInterval(() => {
+                blizzSpeedMult *= 0.9;
+                if(blizzSpeedMult < 0.05) blizzSpeedMult = 0.05; 
+            }, 50);
+        }
+
+        function stopBlizzard() {
+            if(blizzSlowInterval) clearInterval(blizzSlowInterval);
+            const blizzCanvas = document.getElementById('blizzard-canvas');
+            blizzCanvas.style.transition = 'opacity 1.5s ease';
+            blizzCanvas.style.opacity = '0';
+            setTimeout(() => { 
+                cancelAnimationFrame(blizzAnimation); 
+            }, 1500);
+        }
+
+        function blowCake() {
+            const cakeImg = document.querySelector('.interactive-cake');
+            
+            cakeImg.style.transition = "filter 2.5s ease, transform 2.5s ease, opacity 2s ease";
+            cakeImg.style.setProperty('filter', 'drop-shadow(0 -50px 80px rgba(255, 255, 255, 1)) drop-shadow(0 -100px 150px rgba(255, 255, 255, 0.9)) brightness(2.5)', 'important');
+            cakeImg.style.transform = "scale(1.15)";
+            cakeImg.style.opacity = "0"; 
+
+            document.getElementById('cake-svg').style.pointerEvents = "none";
+
+            const whiteout = document.getElementById('whiteout-overlay');
+            document.body.classList.add('layout-locked');
+
+            setTimeout(() => {
+                whiteout.style.transition = "opacity 1s ease-in";
+                whiteout.style.opacity = "1";
+
+                setTimeout(() => {
+                    startBlizzard(); 
+                    performCommonReset();
+
+                    const introScreen = document.getElementById('intro-screen');
+                    const mainStage = document.getElementById('main-stage');
+                    introScreen.style.transition = 'none';
+                    introScreen.style.opacity = '0';
+                    introScreen.style.filter = 'blur(20px)';
+                    mainStage.style.transition = 'none';
+                    mainStage.style.opacity = '0';
+                    mainStage.style.filter = 'blur(20px)';
+
+                    whiteout.style.transition = "opacity 0.5s ease-out";
+                    whiteout.style.opacity = "0";
+                    
+                    // 修正：提前触发缓慢减速效果
+                    setTimeout(() => {
+                        slowDownBlizzard();
+                    }, 1000); 
+
+                    // 修正：整体暴风雪持续时长调短 (4000ms -> 2500ms)
+                    setTimeout(() => {
+                        stopBlizzard();
+
+                        introScreen.style.transition = 'opacity 3.5s ease, filter 3.5s ease';
+                        introScreen.style.opacity = '1';
+                        introScreen.style.filter = 'blur(0px)';
+                        
+                        mainStage.style.transition = 'opacity 3.5s ease, filter 3.5s ease';
+                        mainStage.style.opacity = '1';
+                        mainStage.style.filter = 'blur(0px)';
+
+                        setTimeout(() => {
+                            triggerHomeAnimations();
+                            document.body.classList.remove('layout-locked');
+                        }, 1000);
+                    }, 2500); 
+
+                }, 1000); 
+            }, 800); 
+        }
+
+        function chooseTheEnd() {
+            if (typeof particleFrame !== 'undefined') cancelAnimationFrame(particleFrame);
+            const particleCanvas = document.getElementById('particle-canvas');
+            particleCanvas.style.transition = "opacity 1.5s ease";
+            particleCanvas.style.opacity = "0";
+
+            mainStage.style.transform = "translateY(80px) scale(0.9)";
+            mainStage.style.filter = "blur(25px)"; mainStage.style.opacity = "0";
+            
+            const finalUniverse = document.getElementById('final-universe-overlay');
+            finalUniverse.classList.add('active');
+
+            const starCanvas = document.getElementById('universe-stars-canvas');
+            starCanvas.style.opacity = "1";
+            starCanvas.width = window.innerWidth;
+            starCanvas.height = window.innerHeight;
+            const sCtx = starCanvas.getContext('2d');
+            
+            let stars = [];
+            for (let i = 0; i < 600; i++) {
+                stars.push({
+                    x: Math.random() * starCanvas.width,
+                    y: Math.random() * starCanvas.height,
+                    r: Math.random() * 1.5 + 0.2,
+                    alpha: Math.random(),
+                    speed: (Math.random() * 0.015) + 0.005,
+                    color: Math.random() > 0.75 ? '147, 197, 253' : '255, 255, 255'
+                });
+            }
+
+            function animateStarfield() {
+                sCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+                stars.forEach(s => {
+                    s.alpha += s.speed;
+                    if (s.alpha >= 1 || s.alpha <= 0.1) s.speed = -s.speed;
+                    sCtx.beginPath();
+                    sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    sCtx.fillStyle = `rgba(${s.color}, ${Math.max(0.1, Math.min(1, s.alpha))})`;
+                    sCtx.fill();
+                });
+                starFieldFrame = requestAnimationFrame(animateStarfield);
+            }
+            animateStarfield();
+
+            const nest = document.getElementById('giant-mountain-nest');
+            nest.innerHTML = '';
+            
+            const nestPositions = [
+                { left: '46vw', dwarvesBottom: '13vh', dwarfScale: 1.8, type: 'type-crystal' },
+                { left: '54vw', dwarvesBottom: '13vh', dwarfScale: 1.8, type: 'type-frosted' },
+                { left: '50vw', dwarvesBottom: '9vh', dwarfScale: 1.4, type: 'type-obsidian' },
+                { left: '40vw', dwarvesBottom: '10vh', dwarfScale: 1.6, type: 'type-obsidian' },
+                { left: '60vw', dwarvesBottom: '10vh', dwarfScale: 1.6, type: 'type-crystal' },
+                { left: '34vw', dwarvesBottom: '7vh', dwarfScale: 1.4, type: 'type-frosted' },
+                { left: '66vw', dwarvesBottom: '7vh', dwarfScale: 1.4, type: 'type-obsidian' },
+                { left: '28vw', dwarvesBottom: '4vh', dwarfScale: 1.2, type: 'type-crystal' },
+                { left: '72vw', dwarvesBottom: '4vh', dwarfScale: 1.2, type: 'type-frosted' },
+                { left: '22vw', dwarvesBottom: '2vh', dwarfScale: 1.0, type: 'type-obsidian' },
+                { left: '78vw', dwarvesBottom: '2vh', dwarfScale: 1.0, type: 'type-crystal' },
+                { left: '16vw', dwarvesBottom: '1vh', dwarfScale: 0.9, type: 'type-frosted' },
+                { left: '84vw', dwarvesBottom: '1vh', dwarfScale: 0.9, type: 'type-obsidian' },
+                { left: '45vw', dwarvesBottom: '5vh', dwarfScale: 1.3, type: 'type-crystal' },
+                { left: '55vw', dwarvesBottom: '5vh', dwarfScale: 1.3, type: 'type-frosted' }
+            ];
+
+            nestPositions.forEach((pos, idx) => {
+                const mt = document.createElement('div');
+                mt.className = `page-mountain ${pos.type} stacked-mountain`;
+                mt.style.left = pos.left;
+                nest.appendChild(mt);
+
+                setTimeout(() => {
+                    mt.style.bottom = pos.dwarvesBottom;
+                    mt.style.transform = `translateX(-50%) scale(${pos.dwarfScale})`;
+                    mt.style.opacity = "1";
+                    mt.style.filter = "drop-shadow(0 0 15px rgba(255,255,255,0.05))";
+                }, idx * 100);
+            });
+
+            const poemLines = document.querySelectorAll('#poem-box p');
+            poemLines.forEach((line, i) => {
+                setTimeout(() => {
+                    line.style.filter = "blur(0px)";
+                    if (i === 3) { 
+                        line.style.color = "#ffffff";
+                        line.style.textShadow = "0 0 15px rgba(255,255,255,0.5)";
+                    } else {
+                        line.style.color = "rgba(255,255,255,0.38)";
+                    }
+                }, 3500 + (i * 1800));
+            });
+
+            setTimeout(() => {
+                const cakeSvg = document.getElementById('cake-svg');
+                cakeSvg.style.opacity = "1";
+                cakeSvg.style.pointerEvents = "auto"; 
+            }, 10500); 
+        }
+    </script>
+</body>
+</html>
